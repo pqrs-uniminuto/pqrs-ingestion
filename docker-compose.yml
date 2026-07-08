@@ -1,0 +1,18 @@
+version: '3'
+services:
+  dagster:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./:/app
+    environment:
+      - DAGSTER_HOME=/app
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: pqrs_db
+    ports:
+      - "5432:5432"

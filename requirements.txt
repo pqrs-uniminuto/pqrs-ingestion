@@ -1,0 +1,9 @@
+dagster
+dagster-webserver
+dagster-graphql
+pandas
+pydantic
+sqlalchemy
+psycopg2-binary
+python-dotenv
+openpyxl
