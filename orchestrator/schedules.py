@@ -1,9 +1,10 @@
-from dagster import ScheduleDefinition
-from orchestrator.jobs.ingest_excel import ingest_csv_job
+from dagster import ScheduleDefinition, DefaultScheduleStatus
+from orchestrator.jobs.ingest_open_data import ingest_open_data_job
 
-# Schedule para ejecutar cada hora
-ingest_csv_schedule = ScheduleDefinition(
-    job=ingest_csv_job,
-    cron_schedule="0 * * * *",
-    description="Ejecuta la ingesta del CSV de exportación de flores cada hora"
+ingest_open_data_schedule = ScheduleDefinition(
+    job=ingest_open_data_job,
+    cron_schedule="54 23 * * *",
+    execution_timezone="America/Bogota",
+    default_status=DefaultScheduleStatus.RUNNING,  # <-- Activa el schedule por defecto
+    description="Ejecuta la ingesta de Datos Abiertos a las 10:50 PM"
 )
