@@ -1,13 +1,34 @@
-version: '3'
+version: '3.8'
+
 services:
+  # 1. Servicio de Ingesta (FastAPI + Jinja2 UI)
+  ingestion-api:
+    build: .
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/app
+    environment:
+      - DATABASE_URL=postgresql://user:pass@postgres:5432/pqrs_db
+    depends_on:
+      - postgres
+
+  # 2. Orquestador Dagster
   dagster:
     build: .
+    command: dagster-webserver -h 0.0.0.0 -p 3000
     ports:
       - "3000:3000"
     volumes:
       - ./:/app
     environment:
       - DAGSTER_HOME=/app
+      - DATABASE_URL=postgresql://user:pass@postgres:5432/pqrs_db
+    depends_on:
+      - postgres
+
+  # 3. Base de datos PostgreSQL
   postgres:
     image: postgres:13
     environment:
@@ -16,3 +37,8 @@ services:
       POSTGRES_DB: pqrs_db
     ports:
       - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Recomendado para no perder datos
+
+volumes:
+  postgres_data:

@@ -1,37 +1,65 @@
- README.md
-markdown
-#  PQRS - Sistema de Ingesta de Datos
+# 📥 PQRS - Servicio de Ingesta Dinámica de Datos
 
-Sistema de ingesta automatizada de PQRS (Peticiones, Quejas, Reclamos y Sugerencias) utilizando **Dagster** como orquestador de workflows.
+Microservicio desacoplado de **ingesta, normalización y almacenamiento dinámico** para solicitudes de PQRS (Peticiones, Quejas, Reclamos y Sugerencias). 
 
-##  ¿Qué hace este proyecto?
+Soporta múltiples fuentes de entrada (archivos locales CSV/Excel/JSON y conectores a APIs REST/Socrata), automatiza la creación de tablas dinámicas en **PostgreSQL**, registra los esquemas en un catálogo centralizado y expone tanto una **Interfaz Web (FastAPI + Jinja2 + Tailwind CSS)** como capacidades de orquestación con **Dagster**.
 
-Este sistema permite **ingestar, validar y procesar** archivos de PQRS desde múltiples fuentes:
+---
 
--  **Archivos Excel** (local, URL, FTP)
-- 🔌 **APIs B2B** (próximamente)
--  **Correos electrónicos** (próximamente)
+## 🌟 Características Principales
 
-Todo orquestado de manera automática y monitoreable a través de la interfaz web de Dagster.
+- **Arquitectura Basada en Patrones de Diseño (SOLID):**
+  - **Strategy Pattern & Registry:** Selección dinámica del lector según la fuente sin sentencias `if/elif` extensas.
+  - **Dependency Inversion (DIP):** Inyección de dependencias limpias mediante FastAPI (`Depends`).
+- **Soporte Multi-Formato & Fuentes Remotas:**
+  - Archivos locales: `CSV`, `Excel (.xlsx, .xls)`, `JSON`.
+  - Integración remota: URLs de `APIs REST` y datasets de datos abiertos (`Socrata`).
+- **Persistencia Dinámica & Catálogo Centralizado:**
+  - Crea tablas independientes saneadas en PostgreSQL por cada ingestión (`pqrs_custom_tbl`).
+  - Actualiza automáticamente el catálogo de metadatos (`data_sources_catalog`).
+- **Doble Interfaz de Operación:**
+  - **Web UI:** Formulario interactivo responsivo (Jinja2 + Tailwind CSS).
+  - **Dagster Engine:** Pipelines programables, sensores y ejecuciones orquestadas.
 
-##  Arquitectura
+---
+
+## 📂 Estructura del Proyecto
+
+```text
 pqrs-ingestion/
-├── main.py # Punto de entrada principal
-├── orchestrator/
-│ ├── jobs/ # Jobs de ingesta
-│ │ └── ingest_excel.py # Job para archivos Excel
-│ ├── schedules.py # Programaciones automáticas
-│ └── sensors.py # Sensores para eventos
 ├── connectors/
-│ └── excel_reader.py # Lector de Excel con principios SOLID
-├── validators/
-│ ├── schemas.py # Validación de esquemas con Pydantic
-│ └── business_rules.py # Reglas de negocio
-├── docker-compose.yml # Orquestación con Docker
-├── Dockerfile # Imagen para contenerización
-└── requirements.txt # Dependencias
-
-text
+│   ├── __init__.py
+│   ├── api_b2b_client.py        # Cliente para integración con APIs B2B
+│   ├── email_imap.py            # Módulo de lectura/ingesta vía correo IMAP
+│   ├── excel_reader.py          # Lector especializado de archivos Excel
+│   ├── open_data_client.py      # Cliente orquestador de lectura dinámico (Socrata/OpenData)
+│   ├── registry.py              # Registro por diccionario de estrategias
+│   └── strategies.py            # Patrón Strategy (Lectores CSV, Excel, JSON/API)
+├── docs/                        # Documentación general del módulo
+├── orchestrator/                # Definiciones de pipelines para Dagster
+│   ├── jobs/                    # Jobs de procesamiento programado
+│   ├── __init__.py
+│   └── schedules.py             # Programaciones temporales (Schedules)
+├── repositories/
+│   ├── __init__.py
+│   └── dynamic_repository.py    # Persistencia en Postgres y actualización del Catálogo
+├── routes/
+│   ├── __init__.py
+│   └── upload_routes.py         # Endpoints de FastAPI y controlador de Vistas
+├── templates/
+│   └── upload.html              # Interfaz gráfica interactiva (Jinja2 + Tailwind CSS)
+├── validators/                  # Validadores de esquemas y reglas de datos
+├── venv/                        # Entorno virtual de Python
+├── .env                         # Variables de entorno locales
+├── .env.template                # Plantilla de variables de entorno
+├── .gitignore                   # Exclusiones de control de versiones Git
+├── docker-compose.yml           # Orquestación con PostgreSQL y Dagster
+├── flores.db                    # Base de datos SQLite / fallback local
+├── main.py                      # Punto de entrada principal (Servidor FastAPI)
+├── README.md                    # Documentación y guía del proyecto
+├── reporte_exportacion_flores_validado.csv # Dataset de prueba local
+└── requirements.txt             # Dependencias del proyecto Python
+```
 
 ##  Requisitos Previos
 
@@ -39,9 +67,21 @@ text
 - **Docker** y **Docker Compose** (opcional, para despliegue contenerizado)
 - **PostgreSQL** (para almacenamiento, opcional)
 
-##  Instalación
+##  Instalación y Configuración
 
-### Opción 1: Local (Desarrollo)
+### Variables de Entorno (.env)
+Crea un archivo .env en la raíz del proyecto:
+
+# Configuración del servidor FastAPI
+PORT=8000
+HOST=0.0.0.0
+
+# Conexión a la Base de Datos PostgreSQL
+DATABASE_URL=postgresql://pqrs_user:pqrs_pass@localhost:5432/pqrs_dwh
+
+# Compatibilidad de codificación (Windows)
+PYTHONLEGACYWINDOWSSTDIO=1
+PGCLIENTENCODING=utf-8
 
 ```bash
 # 1. Clonar el repositorio
@@ -65,7 +105,7 @@ mkdir -p data/incoming
 mkdir -p data/processed
 ```
 
-Opción 2: Con Docker (Producción)
+3. Opción B: Ejecución con Docker Compose
 ```bash
 # 1. Clonar el repositorio
 git clone <url-del-repositorio>
@@ -74,7 +114,7 @@ cd pqrs-ingestion
 
 # 2. Levantar todos los servicios
 ```bash
-docker-compose up -d
+docker-compose up -d --build
 ```
 
 # 3. Verificar que todo está funcionando
@@ -111,164 +151,55 @@ docker-compose logs -f dagster
 
 # Ejecutar job manualmente desde la UI
 # Abrir http://localhost:3000 y ejecutar desde la interfaz
-📊 Flujo de Trabajo
-1. Ingesta de Excel
-python
-from connectors.excel_reader import read_excel
 
-# Leer desde archivo local
-df = read_excel('local', file_path='data/pqrs.xlsx')
+```bash
 
-# Leer desde URL
-df = read_excel('url', url='https://ejemplo.com/pqrs.xlsx')
+[ Formulario Upload (Jinja2/Tailwind) ]  ó  [ Solicitud HTTP / API REST ]
+                         │
+                         ▼
+             [ FastAPI /upload_routes ]
+                         │
+                         ▼
+        [ OpenDataClient + Strategy Registry ]
+         ├── CsvIngestionStrategy
+         ├── ExcelIngestionStrategy
+         └── JsonApiIngestionStrategy
+                         │
+                         ▼
+         [ DynamicDatabaseRepository ]
+         ├── Crea tabla independiente: 'nombre_tabla_custom'
+         └── Actualiza metadatos en: 'data_sources_catalog'
+```
 
-# Leer desde FTP
-df = read_excel('ftp', 
-                host='ftp.ejemplo.com',
-                user='usuario',
-                password='clave',
-                file_path='/reportes/pqrs.xlsx')
-2. Validación de Datos
-python
-from validators.schemas import PQRSRecord
-from validators.business_rules import BusinessRules
+```
+id,table_name,source_type,row_count,columns_schema,created_at
+1,pqrs_bogota_2026,FILE_CSV,15420,"{""id"": ""int64"", ""descripcion"": ""object""}",2026-09-01 10:00:00
+2,pqrs_api_socrata,API,8500,"{""ticket_id"": ""object"", ""estado"": ""object""}",2026-09-01 10:30:00
+```
 
-# Validar cada registro
-record = PQRSRecord(**data)
-validation = BusinessRules.apply_rules(data)
-3. Automatización con Dagster
-Schedules: Ejecución automática cada hora
+# Pruebas Unitarias e Integración
 
-Sensors: Reacción a nuevos archivos
+## Ejecutar suite de pruebas con Pytest
+```text
+pytest
+```
+## Generar reporte de cobertura de código
+```bash
+pytest --cov=. --cov-report=html
+```
 
-UI: Monitoreo y ejecución manual
+# Ejecucion sin contenedores
+```bash
+uvicorn main:app --reload --port 8000
+```
 
-⚙️ Configuración
-Variables de Entorno (.env)
-env
-# Configuración de Excel
-EXCEL_PATH=data/pqrs_ingest.xlsx
-SHEET_NAME=0
-REQUIRED_COLUMNS=fecha_recepcion,tipo_pqrs,nombre_solicitante
+## Visualizar pagina inicial
+```text
+http://localhost:8000/upload
+```
 
-# Base de datos
-DATABASE_URL=postgresql://user:pass@postgres:5432/pqrs_db
+![Pagina Inicial Pantalla](docs/pantalla_inicio.png)
 
-# FTP (si se usa)
-FTP_HOST=ftp.ejemplo.com
-FTP_USER=usuario
-FTP_PASSWORD=clave
-FTP_PATH=/reportes/pqrs.xlsx
-Dagster Config
-Editar main.py para configurar:
+## Base de datos
 
-python
-class Config:
-    EXCEL_PATH = os.getenv("EXCEL_PATH", "data/pqrs_ingest.xlsx")
-    REQUIRED_COLUMNS = os.getenv("REQUIRED_COLUMNS", "fecha_recepcion,tipo_pqrs,nombre_solicitante").split(",")
-🧪 Pruebas
-bash
-# Ejecutar todas las pruebas
-pytest tests/
-
-# Ejecutar pruebas específicas
-pytest tests/test_excel_reader.py
-
-# Con cobertura
-pytest --cov=connectors tests/
-📊 Monitoreo
-Dagster UI
-Acceder a http://localhost:3000 para:
-
-📋 Ver todos los jobs disponibles
-
-▶️ Ejecutar jobs manualmente
-
-📊 Ver logs y métricas
-
-⏰ Gestionar schedules y sensors
-
-🔍 Depurar errores
-
-Logs
-bash
-# Ver logs en tiempo real
-docker-compose logs -f dagster
-
-# O desde la UI de Dagster
-# Ir a "Runs" → Seleccionar ejecución → Ver logs
-🔧 Solución de Problemas
-Error: "Module not found"
-bash
-# Verificar que estás en el entorno correcto
-which python
-pip list | grep dagster
-
-# Reinstalar dependencias
-pip install -r requirements.txt --upgrade
-Error: "Permission denied" en archivos
-bash
-# Dar permisos al directorio de datos
-chmod -R 755 data/
-Dagster no inicia
-bash
-# Verificar puerto disponible
-lsof -i :3000  # En Linux/Mac
-netstat -ano | findstr :3000  # En Windows
-
-# Cambiar puerto en el comando
-dagster dev -f main.py --port 3001
-Error de conexión a PostgreSQL
-bash
-# Verificar que PostgreSQL está corriendo
-docker-compose ps postgres
-
-# Reiniciar PostgreSQL
-docker-compose restart postgres
-🗄️ Estructura de Datos Esperada
-Archivo Excel (PQRS)
-Columna	Tipo	Descripción	Obligatorio
-fecha_recepcion	datetime	Fecha de recepción
-tipo_pqrs	string	Petición/Queja/Reclamo/Sugerencia
-canal	string	Correo/Web/Presencial
-nombre_solicitante	string	Nombre completo
-email_solicitante	email	Correo electrónico
-telefono_solicitante	string	Teléfono de contacto
-descripcion	text	Descripción del caso
-estado	string	Recibido/En proceso/Resuelto/Cerrado
-fecha_resolucion	datetime	Fecha de resolución	
-observaciones	text	Observaciones adicionales
-🚀 Roadmap
-Ingesta de archivos Excel
-
-Validación de datos con Pydantic
-
-Reglas de negocio
-
-Orquestación con Dagster
-
-Schedules y Sensors
-
-Ingesta desde APIs B2B
-
-Ingesta desde correos electrónicos
-
-Dashboard de métricas
-
-Alertas y notificaciones
-
-UI personalizada
-
-🤝 Contribuciones
-Fork el proyecto
-
-Crear una rama (git checkout -b feature/nueva-funcionalidad)
-
-Commitear cambios (git commit -am 'Agrega nueva funcionalidad')
-
-Push a la rama (git push origin feature/nueva-funcionalidad)
-
-Crear un Pull Request
-
-📄 Licencia
-Este proyecto está bajo la licencia MIT
+![Pagina Inicial Pantalla](docs/postgresql.png)

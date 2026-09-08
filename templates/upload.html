@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PQRS Ingestión - UNIMINUTO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        uniminuto: {
+                            blue: '#002855',
+                            darkblue: '#001A38',
+                            lightblue: '#004080',
+                            yellow: '#FFC72C',
+                            hoverYellow: '#E5B220',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-100 font-sans antialiased text-slate-800 min-h-screen">
+
+    <!-- Encabezado Institucional -->
+    <header class="bg-uniminuto-blue border-b-4 border-uniminuto-yellow text-white shadow-md">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-4">
+                <!-- Logotipo Oficial UNIMINUTO en reemplazo del icono amarillo -->
+                <div class="bg-white p-1.5 rounded-lg shadow-sm flex items-center justify-center">
+                    <img
+                        src="https://carrerasuniversitarias.com.co/logos/original/logo-corporacion-universitaria-minuto-de-dios-uniminuto.webp"
+                        alt="Logo UNIMINUTO"
+                        class="h-10 w-auto object-contain rounded"
+                    />
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-wide">UNIMINUTO <span class="text-uniminuto-yellow font-normal">| Agentic AI Lab</span></h1>
+                    <p class="text-xs text-slate-300">Evaluación Asistida por Agentes CrewAI + Ollama</p>
+                </div>
+            </div>
+            <div id="data-source-badge" class="flex items-center space-x-2 bg-slate-800/50 px-3.5 py-1.5 rounded-full text-xs text-slate-200 border border-slate-700">
+                <span id="pipeline-indicator" class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+                <span id="dataset-label" class="font-medium">Esperando selección...</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-5xl mx-auto my-8 px-4">
+
+        <!-- Tarjeta Principal de Carga -->
+        <div class="bg-white p-8 rounded-xl shadow-lg border border-slate-200">
+            <div class="mb-6 border-b border-slate-200 pb-4">
+                <h2 class="text-2xl font-bold text-uniminuto-blue flex items-center gap-2">
+                    📥 Carga e Ingestión de Fuentes de Datos
+                </h2>
+                <p class="text-slate-500 text-sm mt-1">
+                    Sube archivos locales (CSV, Excel, JSON) o conecta endpoints de APIs REST para generar tablas en PostgreSQL.
+                </p>
+            </div>
+
+            <!-- Mensajes de Estado (Alertas) -->
+            {% if message %}
+            <div class="mb-6 p-4 rounded-lg text-sm border {% if success %}bg-emerald-50 text-emerald-900 border-emerald-300{% else %}bg-rose-50 text-rose-900 border-rose-300{% endif %}">
+                <div class="flex items-center gap-2 font-bold text-base mb-1">
+                    <span>{% if success %}✅{% else %}⚠️{% endif %}</span>
+                    <span>{{ message }}</span>
+                </div>
+
+                {% if success and text_column %}
+                <div class="mt-3 pt-3 border-t border-emerald-200 text-xs grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div class="bg-emerald-100/60 p-2 rounded border border-emerald-200">
+                        <span class="font-bold text-emerald-950">📝 Columna Texto Detectada:</span>
+                        <code class="ml-1 px-1.5 py-0.5 bg-white text-emerald-800 rounded border border-emerald-300 font-mono">{{ text_column }}</code>
+                    </div>
+                    <div class="bg-emerald-100/60 p-2 rounded border border-emerald-200">
+                        <span class="font-bold text-emerald-950">🏷️ Columna Categoría Detectada:</span>
+                        <code class="ml-1 px-1.5 py-0.5 bg-white text-emerald-800 rounded border border-emerald-300 font-mono">{{ category_column }}</code>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <form action="/upload" method="POST" enctype="multipart/form-data" id="ingestForm" class="space-y-6">
+
+                <!-- Nombre de la Tabla Destino -->
+                <div>
+                    <label class="block text-sm font-bold mb-1 text-uniminuto-blue">
+                        Nombre de la Tabla Destino *
+                    </label>
+                    <input type="text" name="table_name" required placeholder="ej. pqrs_matecana_2026"
+                           class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-uniminuto-blue focus:border-uniminuto-blue focus:outline-none transition-all">
+                </div>
+
+                <!-- Modalidad de Ingesta -->
+                <div>
+                    <label class="block text-sm font-bold mb-2 text-uniminuto-blue">Modalidad de Ingesta</label>
+                    <div class="flex gap-6 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                        <label class="flex items-center gap-2 cursor-pointer text-sm font-semibold text-slate-700">
+                            <input type="radio" name="ingest_mode" value="file" checked onclick="toggleMode('file')"
+                                   class="text-uniminuto-blue focus:ring-uniminuto-blue h-4 w-4">
+                            📁 Archivo Local (CSV, Excel, JSON)
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer text-sm font-semibold text-slate-700">
+                            <input type="radio" name="ingest_mode" value="api" onclick="toggleMode('api')"
+                                   class="text-uniminuto-blue focus:ring-uniminuto-blue h-4 w-4">
+                            🌐 API REST / Socrata URL
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Sección Archivo -->
+                <div id="section-file" class="space-y-2">
+                    <label class="block text-sm font-bold text-slate-700">Seleccionar Archivo *</label>
+                    <input type="file" id="input-file" name="file" required
+                           class="block w-full text-sm text-slate-600 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:bg-uniminuto-blue file:text-white file:font-bold hover:file:bg-uniminuto-darkblue cursor-pointer transition-all">
+                </div>
+
+                <!-- Sección API -->
+                <div id="section-api" class="hidden space-y-2">
+                    <label class="block text-sm font-bold text-slate-700">URL de la API REST *</label>
+                    <input type="url" id="input-api" name="api_url" placeholder="https://www.datos.gov.co/resource/pqrs.json"
+                           class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-uniminuto-blue focus:border-uniminuto-blue focus:outline-none">
+                </div>
+
+                <!-- Opciones Adicionales -->
+                <div class="p-4 bg-slate-50 rounded-lg space-y-3 border border-slate-200">
+                    <h3 class="text-xs font-bold text-uniminuto-blue uppercase tracking-wider">Opciones Adicionales de Formato</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Separador CSV (opcional)</label>
+                            <input type="text" name="sep" placeholder="Auto / ',' / ';'" class="w-full px-3 py-1.5 border border-slate-300 rounded text-sm bg-white focus:ring-1 focus:ring-uniminuto-blue focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Hoja de Excel (opcional)</label>
+                            <input type="text" name="sheet_name" placeholder="Ej. Hoja1 o 0" class="w-full px-3 py-1.5 border border-slate-300 rounded text-sm bg-white focus:ring-1 focus:ring-uniminuto-blue focus:outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botón de Envío estilo UNIMINUTO -->
+                <button type="submit" id="submitBtn"
+                        class="w-full py-3 bg-uniminuto-yellow hover:bg-uniminuto-hoverYellow text-uniminuto-blue font-extrabold rounded-lg shadow-md transition-all flex justify-center items-center gap-2 text-base border border-amber-300">
+                    <span>🚀 Procesar e Ingestar en la Base de Datos</span>
+                </button>
+            </form>
+        </div>
+
+        <!-- Catálogo de Tablas Ingestadas -->
+        {% if catalog %}
+        <div class="mt-8 bg-white p-6 rounded-xl shadow-lg border border-slate-200">
+            <h3 class="text-lg font-bold text-uniminuto-blue mb-4 flex items-center gap-2">
+                📊 Catálogo de Fuentes Ingestadas
+            </h3>
+            <div class="overflow-x-auto rounded-lg border border-slate-200">
+                <table class="w-full text-sm text-left text-slate-600">
+                    <thead class="text-xs text-white uppercase bg-uniminuto-blue">
+                        <tr>
+                            <th class="px-4 py-3">Nombre Tabla</th>
+                            <th class="px-4 py-3">Origen</th>
+                            <th class="px-4 py-3">Registros</th>
+                            <th class="px-4 py-3">Columna Texto</th>
+                            <th class="px-4 py-3">Columna Categoría</th>
+                            <th class="px-4 py-3">Fecha Registrada</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 bg-white">
+                        {% for item in catalog %}
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-4 py-3 font-bold text-uniminuto-blue">{{ item.table_name }}</td>
+                            <td class="px-4 py-3">
+                                <span class="px-2.5 py-0.5 text-xs font-bold bg-amber-100 text-amber-900 rounded-full border border-amber-200">
+                                    {{ item.source_type }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 font-semibold text-slate-700">{{ item.row_count }}</td>
+                            <td class="px-4 py-3 font-mono text-xs text-slate-700">
+                                <span class="bg-slate-100 px-2 py-0.5 rounded border border-slate-300">
+                                    {{ item.text_column or 'N/A' }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 font-mono text-xs text-slate-700">
+                                <span class="bg-slate-100 px-2 py-0.5 rounded border border-slate-300">
+                                    {{ item.category_column or 'N/A' }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 text-xs text-slate-400">{{ item.created_at }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <!-- Script de control dinámico y estado de envío -->
+    <script>
+        function toggleMode(mode) {
+            const sectionFile = document.getElementById('section-file');
+            const sectionApi = document.getElementById('section-api');
+            const inputFile = document.getElementById('input-file');
+            const inputApi = document.getElementById('input-api');
+
+            if (mode === 'file') {
+                sectionFile.classList.remove('hidden');
+                sectionApi.classList.add('hidden');
+                inputFile.required = true;
+                inputApi.required = false;
+                inputApi.value = '';
+            } else {
+                sectionFile.classList.add('hidden');
+                sectionApi.classList.remove('hidden');
+                inputFile.required = false;
+                inputApi.required = true;
+                inputFile.value = '';
+            }
+        }
+
+        document.getElementById('ingestForm').addEventListener('submit', function() {
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.classList.add('opacity-75', 'cursor-not-allowed');
+            btn.innerHTML = `
+                <svg class="animate-spin h-5 w-5 text-uniminuto-blue" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Procesando e ingestando en PostgreSQL...</span>
+            `;
+        });
+    </script>
+</body>
+</html>

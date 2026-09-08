@@ -1,9 +1,22 @@
+# --- Framework Web & Servidor ---
+fastapi
+uvicorn[standard]
+python-multipart
+jinja2
+
+# --- Orquestación (Dagster) ---
 dagster
 dagster-webserver
 dagster-graphql
+
+# --- Procesamiento de Datos & Conectores ---
 pandas
 pydantic
+requests
+openpyxl
+
+# --- Persistencia & Base de Datos ---
 sqlalchemy
 psycopg2-binary
 python-dotenv
-openpyxl
+psycopg[binary]
