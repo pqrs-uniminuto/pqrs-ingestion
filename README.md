@@ -48,106 +48,140 @@ pqrs-ingestion/
 │   └── upload_routes.py         # Endpoints de FastAPI y controlador de Vistas
 ├── templates/
 │   └── upload.html              # Interfaz gráfica interactiva (Jinja2 + Tailwind CSS)
-├── validators/                  # Validadores de esquemas y reglas de datos
-├── venv/                        # Entorno virtual de Python
 ├── .env                         # Variables de entorno locales
-├── .env.template                # Plantilla de variables de entorno
 ├── .gitignore                   # Exclusiones de control de versiones Git
-├── docker-compose.yml           # Orquestación con PostgreSQL y Dagster
-├── flores.db                    # Base de datos SQLite / fallback local
+├── docker-compose.yml           # Orquestación con PostgreSQL, FastAPI y Dagster
+├── Dockerfile                   # Construcción de imagen ligera optimizada (Python 3.12-slim)
 ├── main.py                      # Punto de entrada principal (Servidor FastAPI)
 ├── README.md                    # Documentación y guía del proyecto
-├── reporte_exportacion_flores_validado.csv # Dataset de prueba local
 └── requirements.txt             # Dependencias del proyecto Python
 ```
 
 ##  Requisitos Previos
 
-- **Python 3.10** o superior
+- **Python 3.12 (recomendado para desarrollo local)
 - **Docker** y **Docker Compose** (opcional, para despliegue contenerizado)
 - **PostgreSQL** (para almacenamiento, opcional)
 
 ##  Instalación y Configuración
 
+## 📥 Clonación y Preparación del Proyecto
+
+Sigue estos pasos para obtener el código fuente y preparar el entorno de trabajo:
+
+```bash
+# 1. Clonar el repositorio desde GitHub / GitLab
+git clone [https://github.com/tu-usuario/pqrs-ingestion.git](https://github.com/tu-usuario/pqrs-ingestion.git)
+
+# 2. Navegar al directorio raíz del proyecto
+cd pqrs-ingestion
+
+# 3. Crear el archivo de configuración .env a partir de la plantilla
+cp .env.template .env   # En Linux / macOS
+copy .env.template .env # En Windows (PowerShell / CMD)
+```
+
 ### Variables de Entorno (.env)
 Crea un archivo .env en la raíz del proyecto:
 
-# Configuración del servidor FastAPI
-PORT=8000
-HOST=0.0.0.0
+```text
+# ==============================================================================
+# 1. PUERTOS Y SERVICIOS (PODMAN / DOCKER COMPOSE)
+# ==============================================================================
+INGESTION_API_PORT=8000
+DAGSTER_PORT=3000
 
-# Conexión a la Base de Datos PostgreSQL
-DATABASE_URL=postgresql://pqrs_user:pqrs_pass@localhost:5432/pqrs_dwh
+# ==============================================================================
+# 2. FUENTES DE DATOS (EXCEL & SOCRATA API)
+# ==============================================================================
+EXCEL_PATH=data/pqrs_ingest.xlsx
+SHEET_NAME=0
+REQUIRED_COLUMNS=fecha_recepcion,tipo_pqrs,nombre_solicitante
+SOCRATA_ENDPOINT=[https://www.datos.gov.co/resource/e88e-ctba.json](https://www.datos.gov.co/resource/e88e-ctba.json)
 
-# Compatibilidad de codificación (Windows)
+# ==============================================================================
+# 3. CONEXIÓN A BASE DE DATOS (POSTGRESQL DWH)
+# ==============================================================================
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgrespassword
+POSTGRES_HOST=pqrs_postgres_dwh
+POSTGRES_PORT=5438
+POSTGRES_DB=pqrs_db
+
+# Cadena de conexión canónica compartida para SQLAlchemy / Psycopg2
+DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?client_encoding=utf8
+
+# ==============================================================================
+# 4. CONFIGURACIÓN DE DAGSTER & ENTORNO
+# ==============================================================================
+DAGSTER_HOME=/app
+
+# ==============================================================================
+# 5. COMPATIBILIDAD Y CODIFICACIÓN (WINDOWS / PODMAN)
+# ==============================================================================
 PYTHONLEGACYWINDOWSSTDIO=1
 PGCLIENTENCODING=utf-8
-
-```bash
-# 1. Clonar el repositorio
-git clone <url-del-repositorio>
-cd pqrs-ingestion
+PYTHONUTF8=1
 ```
-# 2. Crear entorno virtual (recomendado)
-```bash
+
+🚀 Despliegue con Podman / Docker Compose (Recomendado)
+
+El entorno contenedorizado despliega 3 servicios coordinados (pqrs_postgres_dwh, 
+pqrs_ingestion_api y pqrs_dagster_webserver) conectados mediante la red compartida externa pqrs_red_compartida.
+
+1. Crear la Red Compartida 
+Asegúrate de que la red compartida externa exista antes de iniciar los servicios:
+```Bash
+podman network create pqrs_red_compartida
+```
+
+2. Levantar los Servicios
+
+Construye e inicia los contenedores en segundo plano:
+```Bash
+podman-compose up -d --build
+```
+
+
+3. Verificar Contenedores Activos
+
+Comprueba que los 3 contenedores estén arriba y en sus respectivos puertos:
+
+```Bash
+podman ps
+```
+
+Deberías ver una salida similar a:
+
+| Nombre del Contenedor | Puerto Interno | Puerto Expuesto (Host) | Servicio |
+| :--- | :--- | :--- | :--- |
+| **`pqrs_postgres_dwh`** | 5432 | **5438** | PostgreSQL DWH |
+| **`pqrs_ingestion_api`** | 8000 | **8000** | FastAPI UI / REST |
+| **`pqrs_dagster_webserver`** | 3000 | **3000** | Dagster Webserver |
+
+
+4. Detener o Limpiar el Entorno
+5. 
+Detener manteniendo los datos: podman-compose down
+
+Limpieza completa de Pods colgados: podman pod rm -f pod_pqrs-ingestion
+
+🏃 Ejecución Local (Sin Contenedores)
+Si prefieres ejecutar el código directamente en tu máquina local:
+
+
+# 1. Crear e iniciar entorno virtual
 python -m venv venv
 source venv/bin/activate  # En Windows: venv\Scripts\activate
-```
 
-# 3. Instalar dependencias
-```bash
+# 2. Instalar dependencias
 pip install -r requirements.txt
-```
 
-# 4. Crear directorio para datos
-```bash
-mkdir -p data/incoming
-mkdir -p data/processed
-```
+# 3. Iniciar el servidor web de FastAPI
+uvicorn main:app --reload --port 8000
 
-3. Opción B: Ejecución con Docker Compose
-```bash
-# 1. Clonar el repositorio
-git clone <url-del-repositorio>
-cd pqrs-ingestion
-```
-
-# 2. Levantar todos los servicios
-```bash
-docker-compose up -d --build
-```
-
-# 3. Verificar que todo está funcionando
-```bash
-docker-compose ps
-```
-🏃 Ejecución
-
-Desarrollo Local
-```bash
-# Iniciar la interfaz web de Dagster
+# 4. Iniciar la interfaz web de Dagster (en otra terminal)
 dagster dev -f main.py
-```
-
-# Acceder a la UI en: http://localhost:3000
-Ejecutar un Job específico
-```bash
-# Desde línea de comandos
-python main.py
-```
-# O usando Dagster CLI
-```bash
-dagster job execute -f main.py -j ingest_excel_job
-```
-Con Docker
-```bash
-# Levantar servicios
-docker-compose up -d
-```
-# Ver logs
-```bash
-docker-compose logs -f dagster
-```
 
 # Ejecutar job manualmente desde la UI
 # Abrir http://localhost:3000 y ejecutar desde la interfaz

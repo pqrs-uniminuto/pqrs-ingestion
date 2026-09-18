@@ -1,44 +1,74 @@
 version: '3.8'
 
 services:
-  # 1. Servicio de Ingesta (FastAPI + Jinja2 UI)
+  # ============================================================================
+  # 1. Base de Datos PostgreSQL (DWH)
+  # ============================================================================
+  pqrs-db:
+    image: postgres:15-alpine
+    container_name: ${POSTGRES_HOST:-pqrs_postgres_dwh}
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pqrs_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgrespassword}
+    ports:
+      # Mapea el puerto 5438 del host al puerto 5432 interno del contenedor
+      - "${POSTGRES_PORT:-5438}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - pqrs_red_compartida
+
+  # ============================================================================
+  # 2. Servicio de Ingesta (FastAPI + Jinja2 UI)
+  # ============================================================================
   ingestion-api:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pqrs_ingestion_api
+    restart: always
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     ports:
-      - "8000:8000"
+      - "${INGESTION_API_PORT:-8000}:8000"
     volumes:
       - ./:/app
-    environment:
-      - DATABASE_URL=postgresql://user:pass@postgres:5432/pqrs_db
+    env_file:
+      - .env
     depends_on:
-      - postgres
+      - pqrs-db
+    networks:
+      - pqrs_red_compartida
 
-  # 2. Orquestador Dagster
+  # ============================================================================
+  # 3. Orquestador Dagster (Webserver / UI)
+  # ============================================================================
   dagster:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pqrs_dagster_webserver
+    restart: always
     command: dagster-webserver -h 0.0.0.0 -p 3000
     ports:
-      - "3000:3000"
+      - "${DAGSTER_PORT:-3000}:3000"
     volumes:
       - ./:/app
-    environment:
-      - DAGSTER_HOME=/app
-      - DATABASE_URL=postgresql://user:pass@postgres:5432/pqrs_db
+    env_file:
+      - .env
     depends_on:
-      - postgres
+      - pqrs-db
+    networks:
+      - pqrs_red_compartida
 
-  # 3. Base de datos PostgreSQL
-  postgres:
-    image: postgres:13
-    environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: pass
-      POSTGRES_DB: pqrs_db
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data # Recomendado para no perder datos
-
+# ==============================================================================
+# Volúmenes y Redes
+# ==============================================================================
 volumes:
   postgres_data:
+    driver: local
+
+networks:
+  pqrs_red_compartida:
+    external: true

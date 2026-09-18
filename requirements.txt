@@ -1,22 +1,24 @@
 # --- Framework Web & Servidor ---
-fastapi
-uvicorn[standard]
-python-multipart
-jinja2
+fastapi==0.115.8
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+jinja2==3.1.5
 
 # --- Orquestación (Dagster) ---
-dagster
-dagster-webserver
-dagster-graphql
+# Se fijan en el mismo release para evitar descalces en la interfaz gráfica
+dagster==1.9.12
+dagster-webserver==1.9.12
+dagster-graphql==1.9.12
 
 # --- Procesamiento de Datos & Conectores ---
-pandas
-pydantic
-requests
-openpyxl
+# NumPy 2.x y Pandas 2.2+ cuentan con wheels nativos inmediatos para CPython 3.12
+pandas==2.2.3
+pydantic==2.10.6
+requests==2.32.3
+openpyxl==3.1.5
 
 # --- Persistencia & Base de Datos ---
-sqlalchemy
-psycopg2-binary
-python-dotenv
-psycopg[binary]
+sqlalchemy==2.0.38
+psycopg2-binary==2.9.10
+psycopg[binary]==3.2.4
+python-dotenv==1.0.1
